@@ -1,0 +1,17 @@
+services:
+  web:
+    build: .
+    image: oxy-course-planner-demo:dev
+    ports:
+      # host:container — bound to localhost only. Change the left number to use another port.
+      - "127.0.0.1:5280:5280"
+    environment:
+      - PORT=5280
+      - VITE_USE_POLLING=true
+    volumes:
+      # Only source files are mounted (read-only) so edits hot-reload in the browser.
+      # node_modules and build output stay inside the container; nothing is written to the host.
+      - ./src:/app/src:ro
+      - ./index.html:/app/index.html:ro
+      - ./vite.config.ts:/app/vite.config.ts:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
