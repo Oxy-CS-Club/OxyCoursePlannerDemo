@@ -1,8 +1,10 @@
-// Spec §3.5: year, major (incl. 3-2 tracks), and course history (type-to-match).
+// Spec §3.5: year, majors (incl. 3-2 tracks), and course history with the term taken.
+import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { courseCode, getCourse, listCourses } from "../api/catalog";
 import { CoreBadge, InstitutionBadge } from "../components/Badges";
 import { Combobox, type Option } from "../components/Combobox";
+import { HISTORY_TERMS } from "../data/catalog";
 import { CORES } from "../data/cores";
 import { MAJOR_BY_ID, MAJORS } from "../data/majors";
 import { satisfiedCores } from "../lib/recommend";
@@ -16,14 +18,9 @@ const YEARS: { v: Profile["year"]; label: string }[] = [
   { v: 4, label: "Senior" },
 ];
 
-const SAMPLES: { label: string; profile: Profile }[] = [
-  { label: "First-year, Physics 3-2", profile: { year: 1, majorIds: ["phys-32"], history: ["oxy-math-120"] } },
-  { label: "Junior, CS + Math double major", profile: { year: 3, majorIds: ["comp", "math"], history: ["oxy-comp-131", "oxy-comp-229", "oxy-math-120", "oxy-fys-106", "oxy-hist-270", "oxy-arts-101"] } },
-  { label: "Senior, History", profile: { year: 4, majorIds: ["hist"], history: ["oxy-hist-101", "oxy-hist-270", "oxy-hist-380", "oxy-fys-101", "oxy-arth-150", "oxy-chem-120", "oxy-dwa-101"] } },
-];
-
 export function ProfilePage() {
   const { user, data, updateProfile } = useApp();
+  const [historyTerm, setHistoryTerm] = useState(HISTORY_TERMS[HISTORY_TERMS.length - 2].id);
   if (!user) return <Navigate to="/login" replace />;
   const p = data.profile;
 
@@ -37,15 +34,6 @@ export function ProfilePage() {
       <p className="mb-4 text-sm text-stone-500">
         Signed in as {user.name} ({user.email}). This information drives the recommendation sidebar.
       </p>
-
-      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-orange-300 bg-orange-50 p-3 text-sm">
-        <span className="font-medium text-orange-900">Demo shortcuts:</span>
-        {SAMPLES.map((s) => (
-          <button key={s.label} onClick={() => updateProfile(s.profile)} className="rounded-lg border border-orange-300 bg-white px-2 py-1 text-xs hover:bg-orange-100">
-            {s.label}
-          </button>
-        ))}
-      </div>
 
       <div className="grid gap-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:grid-cols-2">
         <div>
@@ -92,36 +80,70 @@ export function ProfilePage() {
 
       <div className="mt-5 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-2 font-semibold">Courses you've taken</h2>
-        <div className="mb-3 max-w-md">
-          <Combobox
-            label="Add a course"
-            options={courseOptions}
-            value={null}
-            resetOnSelect
-            disabledValues={p.history}
-            onChange={(v) => v && updateProfile({ history: [...p.history, v] })}
-            placeholder='Type e.g. "calc" or "comp 131"'
-          />
+        <div className="mb-3 flex max-w-xl flex-wrap items-end gap-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">Term taken</span>
+            <select value={historyTerm} onChange={(e) => setHistoryTerm(e.target.value)} className="rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm">
+              {HISTORY_TERMS.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="min-w-64 flex-1">
+            <Combobox
+              label="Add a course"
+              options={courseOptions}
+              value={null}
+              resetOnSelect
+              disabledValues={p.history.map((h) => h.courseId)}
+              onChange={(v) => v && updateProfile({ history: [...p.history, { courseId: v, termId: historyTerm }] })}
+              placeholder='Type e.g. "calc" or "comp 131"'
+            />
+          </div>
         </div>
         {p.history.length === 0 ? (
           <p className="text-sm text-stone-400">No courses added yet.</p>
         ) : (
-          <ul className="flex flex-wrap gap-2">
-            {p.history.map((id) => {
-              const c = getCourse(id);
+          <div className="space-y-2">
+            {[...HISTORY_TERMS].reverse().map((t) => {
+              const items = p.history.filter((h) => h.termId === t.id);
+              if (items.length === 0) return null;
               return (
-                <li key={id} className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-2 py-1 text-sm">
-                  <InstitutionBadge institution={c.institution} />
-                  <span className="font-medium">{courseCode(c)}</span>
-                  <span className="text-stone-500">{c.title}</span>
-                  <button className="ml-1 text-stone-400 hover:text-red-600" aria-label={`Remove ${courseCode(c)}`} onClick={() => updateProfile({ history: p.history.filter((x) => x !== id) })}>
-                    ✕
-                  </button>
-                </li>
+                <div key={t.id}>
+                  <div className="mb-1 text-xs font-semibold text-stone-500">{t.name}</div>
+                  <ul className="flex flex-wrap gap-2">
+                    {items.map((h) => {
+                      const c = getCourse(h.courseId);
+                      return (
+                        <li key={h.courseId} className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-2 py-1 text-sm">
+                          <InstitutionBadge institution={c.institution} />
+                          <span className="font-medium">{courseCode(c)}</span>
+                          <span className="text-stone-500">{c.title}</span>
+                          <button
+                            className="ml-1 text-stone-400 hover:text-red-600"
+                            aria-label={`Remove ${courseCode(c)}`}
+                            onClick={() => updateProfile({ history: p.history.filter((x) => x.courseId !== h.courseId) })}
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
+        <p className="mt-3 text-xs text-stone-500">
+          Your past courses also appear on{" "}
+          <Link to="/my-courses" className="text-orange-700 underline">
+            My Courses
+          </Link>
+          , next to your final schedules.
+        </p>
 
         <h3 className="mt-5 mb-2 text-sm font-semibold">Core progress (from your history)</h3>
         <ul className="grid gap-1 sm:grid-cols-2">

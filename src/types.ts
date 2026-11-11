@@ -15,10 +15,21 @@ export interface CoreCategory {
   description: string;
 }
 
+/** Dates are "YYYY-MM-DD" in Pacific time. */
+export interface DateSpan {
+  start: string;
+  end: string;
+  name?: string;
+}
+
 export interface Term {
   id: string;
   name: string;
   status: TermStatus;
+  /** First and last day of classes, plus breaks with no classes (used for calendar export). */
+  startDate: string;
+  endDate: string;
+  breaks: DateSpan[];
   /** Caltech quarters that roughly fall inside this Oxy semester. */
   caltechQuarters: CaltechQuarter[];
 }
@@ -52,11 +63,12 @@ export interface Course {
   tags: CourseTag[];
 }
 
+// counts.oxy.edu lists no rooms, so meetings carry no location.
+// Students can add a room themselves (see UserData.locations).
 export interface Meeting {
   days: Day[];
   start: string; // "HH:MM" 24h
   end: string;
-  location: string;
   kind?: "Lecture" | "Lab";
 }
 
@@ -68,9 +80,10 @@ export interface Section {
   crn: string;
   instructorIds: string[];
   meetings: Meeting[];
+  /** "Max Seats" on counts. We do not show remaining seats. */
   capacity: number;
-  /** Reserved for a future feature (live seat counts). Always null in v1. */
-  seatsRemaining: number | null;
+  /** A lab with its own CRN (e.g. COMP 131 section "1-1"): 0 units, title + " Lab". */
+  isLab?: boolean;
   caltechQuarter?: CaltechQuarter;
 }
 
@@ -101,7 +114,18 @@ export interface Profile {
   year: 1 | 2 | 3 | 4 | null;
   /** Students can declare more than one major (double major, major + 3-2 track, …). */
   majorIds: string[];
-  history: string[]; // course ids
+  history: HistoryEntry[];
+}
+
+export interface HistoryEntry {
+  courseId: string;
+  termId: string; // a HISTORY_TERMS id, e.g. "FA25"
+}
+
+export interface FinalSchedule {
+  name: string;
+  sectionIds: string[];
+  finalizedAt: string; // ISO timestamp
 }
 
 export interface User {
@@ -114,4 +138,8 @@ export interface UserData {
   schedules: Schedule[];
   activeScheduleByTerm: Record<string, string>;
   profile: Profile;
+  /** One final schedule per term, shown on My Courses. Overwritten when updated. */
+  finalSchedules: Record<string, FinalSchedule>;
+  /** Rooms students typed in themselves, keyed "<sectionId>#<meetingIndex>". */
+  locations: Record<string, string>;
 }

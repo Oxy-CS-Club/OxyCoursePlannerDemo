@@ -94,6 +94,7 @@ export function CollectionsPage() {
                         {courseCode(course)}-{s.sectionNo}
                       </b>{" "}
                       {course.title}
+                      {s.isLab ? " Lab" : ""}
                       <div className="text-xs text-stone-500">
                         {TERM_BY_ID[s.termId].name} · {instructorNames(s)} · {s.meetings.map(fmtMeeting).join("; ")}
                       </div>

@@ -34,6 +34,11 @@ export function Layout() {
               Visualizer
             </NavLink>
             {user && (
+              <NavLink to="/my-courses" className={navCls}>
+                My Courses
+              </NavLink>
+            )}
+            {user && (
               <NavLink to="/profile" className={navCls}>
                 Profile
               </NavLink>

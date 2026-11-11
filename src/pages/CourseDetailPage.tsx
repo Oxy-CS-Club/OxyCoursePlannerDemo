@@ -1,8 +1,9 @@
 // Spec §3.2: full course info + RateMyClass buttons that open in a NEW browser tab.
 import { Link, useParams } from "react-router-dom";
-import { courseCode, getCourse, getInstructor, instructorNames, sectionsForCourse } from "../api/catalog";
+import { courseCode, getCourse, getInstructor, instructorNames, sectionsForCourse, sectionUnits } from "../api/catalog";
 import { courseRatingsUrl, professorRatingsUrl } from "../api/ratings";
 import { CoreBadge, InstitutionBadge, QuarterBadge } from "../components/Badges";
+import { CalendarActions } from "../components/CalendarActions";
 import { FavoriteButton } from "../components/FavoriteButton";
 import { TERM_BY_ID } from "../data/catalog";
 import { CORE_BY_CODE } from "../data/cores";
@@ -93,7 +94,8 @@ export function CourseDetailPage() {
                 <th className="px-3 py-2">CRN</th>
                 <th className="px-3 py-2">Instructor</th>
                 <th className="px-3 py-2">Meetings</th>
-                <th className="px-3 py-2">Capacity</th>
+                <th className="px-3 py-2">Max seats</th>
+                <th className="px-3 py-2">Calendar</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -101,22 +103,22 @@ export function CourseDetailPage() {
               {sections.map((s) => (
                 <tr key={s.id} className="border-t border-stone-100 align-top">
                   <td className="px-3 py-2 font-medium">
-                    {s.sectionNo} <QuarterBadge quarter={s.caltechQuarter} />
+                    {s.sectionNo} {s.isLab && <span className="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[11px] text-indigo-800">Lab · {sectionUnits(s)} units</span>}{" "}
+                    <QuarterBadge quarter={s.caltechQuarter} />
                   </td>
                   <td className="px-3 py-2 text-stone-500">{s.crn}</td>
                   <td className="px-3 py-2">{instructorNames(s)}</td>
                   <td className="px-3 py-2">
                     {s.meetings.map((mt, i) => (
-                      <div key={i}>
-                        {fmtMeeting(mt)} · <span className="text-stone-500">{mt.location}</span>
-                      </div>
+                      <div key={i}>{fmtMeeting(mt)}</div>
                     ))}
+                    {s.meetings.length > 1 && <div className="text-xs text-stone-400">Same CRN, separate meeting times</div>}
                   </td>
                   <td className="px-3 py-2">
                     {s.capacity}
-                    <div className="text-xs text-stone-400" title="Planned future feature">
-                      remaining: —
-                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <CalendarActions section={s} />
                   </td>
                   <td className="px-3 py-2 text-right">
                     <FavoriteButton sectionId={s.id} />

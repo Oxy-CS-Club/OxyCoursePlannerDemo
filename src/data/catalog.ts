@@ -1,12 +1,49 @@
 // MOCK DATA for the demo. Course titles, instructors, times and rooms are
 // illustrative only and are NOT the official Oxy or Caltech schedule.
-import type { Course, Day, Department, Instructor, Meeting, Section, Term } from "../types";
+import type { CaltechQuarter, Course, DateSpan, Day, Department, Instructor, Meeting, Section, Term } from "../types";
 
+// Term dates are MOCK values for the calendar export demo.
 export const TERMS: Term[] = [
-  { id: "SP26", name: "Spring 2026", status: "past", caltechQuarters: ["WI", "SP"] },
-  { id: "FA26", name: "Fall 2026", status: "current", caltechQuarters: ["FA"] },
-  { id: "SP27", name: "Spring 2027", status: "future", caltechQuarters: ["WI", "SP"] },
+  { id: "SP26", name: "Spring 2026", status: "past", caltechQuarters: ["WI", "SP"], startDate: "2026-01-20", endDate: "2026-05-08", breaks: [{ start: "2026-03-16", end: "2026-03-20", name: "Spring Break" }] },
+  {
+    id: "FA26",
+    name: "Fall 2026",
+    status: "current",
+    caltechQuarters: ["FA"],
+    startDate: "2026-08-31",
+    endDate: "2026-12-11",
+    breaks: [
+      { start: "2026-10-19", end: "2026-10-20", name: "Fall Break" },
+      { start: "2026-11-25", end: "2026-11-27", name: "Thanksgiving Break" },
+    ],
+  },
+  { id: "SP27", name: "Spring 2027", status: "future", caltechQuarters: ["WI", "SP"], startDate: "2027-01-19", endDate: "2027-05-07", breaks: [{ start: "2027-03-15", end: "2027-03-19", name: "Spring Break" }] },
 ];
+
+/** MOCK Caltech quarter dates, keyed by the Oxy term they fall in. */
+export const CALTECH_QUARTER_DATES: Record<string, Partial<Record<CaltechQuarter, DateSpan & { breaks: DateSpan[] }>>> = {
+  SP26: {
+    WI: { start: "2026-01-05", end: "2026-03-20", breaks: [] },
+    SP: { start: "2026-03-30", end: "2026-06-12", breaks: [] },
+  },
+  FA26: { FA: { start: "2026-09-28", end: "2026-12-11", breaks: [{ start: "2026-11-26", end: "2026-11-27", name: "Thanksgiving" }] } },
+  SP27: {
+    WI: { start: "2027-01-04", end: "2027-03-19", breaks: [] },
+    SP: { start: "2027-03-29", end: "2027-06-11", breaks: [] },
+  },
+};
+
+/** Terms students can pick when recording courses they already took (history only). */
+export const HISTORY_TERMS: { id: string; name: string }[] = [
+  { id: "FA23", name: "Fall 2023" },
+  { id: "SP24", name: "Spring 2024" },
+  { id: "FA24", name: "Fall 2024" },
+  { id: "SP25", name: "Spring 2025" },
+  { id: "FA25", name: "Fall 2025" },
+  { id: "SP26", name: "Spring 2026" },
+  { id: "FA26", name: "Fall 2026" },
+];
+export const HISTORY_TERM_NAME = Object.fromEntries(HISTORY_TERMS.map((t) => [t.id, t.name])) as Record<string, string>;
 
 export const QUARTER_NAMES = { FA: "Fall quarter", WI: "Winter quarter", SP: "Spring quarter" } as const;
 
@@ -85,6 +122,7 @@ export const COURSES: Course[] = [
   // ---- Physics ----
   course({ institution: "Oxy", dept: "PHYS", number: "120", title: "Mechanics", cores: ["CPMS", "CPLS"], prereqs: "MATH 120 (may be concurrent)", description: "Newtonian mechanics with a weekly laboratory." }),
   course({ institution: "Oxy", dept: "PHYS", number: "220", title: "Electricity and Magnetism", cores: ["CPLS"], prereqs: "PHYS 120, MATH 212 (may be concurrent)", description: "Electric and magnetic fields, circuits and Maxwell's equations, with lab." }),
+  course({ institution: "Oxy", dept: "PHYS", number: "310", title: "Mathematical Methods in Physics", cores: ["CPMS"], prereqs: "PHYS 220, MATH 214", description: "Vector calculus, linear algebra and differential equations for physics. Meets MWF plus an extra Tuesday session under the same CRN." }),
   course({ institution: "Oxy", dept: "PHYS", number: "490", title: "Senior Seminar in Physics", cores: [], tags: ["senior-seminar"], prereqs: "Senior standing", description: "Senior research presentations and the physics comprehensive requirement." }),
   // ---- Natural sciences ----
   course({ institution: "Oxy", dept: "CHEM", number: "120", title: "General Chemistry", cores: ["CPMS", "CPLS"], description: "Atomic structure, bonding, reactions and equilibrium, with lab." }),
@@ -119,11 +157,10 @@ export const INSTRUCTOR_BY_ID = Object.fromEntries(INSTRUCTORS.map((i) => [i.id,
 export const TERM_BY_ID = Object.fromEntries(TERMS.map((t) => [t.id, t])) as Record<string, Term>;
 
 // ---- Sections ----
-const m = (days: string, start: string, end: string, location: string, kind?: Meeting["kind"]): Meeting => ({
+const m = (days: string, start: string, end: string, kind?: Meeting["kind"]): Meeting => ({
   days: days.split("") as Day[],
   start,
   end,
-  location,
   kind,
 });
 
@@ -136,6 +173,7 @@ const s = (
   meetings: Meeting[],
   capacity: number,
   caltechQuarter?: Section["caltechQuarter"],
+  isLab?: boolean,
 ): Section => ({
   id: `${courseId}-${termId}-${sectionNo}`.toLowerCase(),
   courseId,
@@ -145,76 +183,92 @@ const s = (
   instructorIds,
   meetings,
   capacity,
-  seatsRemaining: null,
   caltechQuarter,
+  isLab,
 });
+/** A lab section with its own CRN, numbered like counts: lecture "1" → labs "1-1", "1-2". */
+const lab = (courseId: string, termId: string, sectionNo: string, instructorIds: string[], meeting: Meeting, capacity: number) =>
+  s(courseId, termId, sectionNo, instructorIds, [meeting], capacity, undefined, true);
 
 export const SECTIONS: Section[] = [
   // ===== Fall 2026 (current) =====
-  s("oxy-fys-101", "FA26", "01", ["hernandez"], [m("TR", "10:30", "11:55", "Johnson 203")], 16),
-  s("oxy-fys-106", "FA26", "01", ["nguyen"], [m("MW", "13:30", "14:55", "Fowler 110")], 16),
-  s("oxy-fys-112", "FA26", "01", ["moreau"], [m("TR", "13:30", "14:55", "Booth 104")], 16),
+  s("oxy-fys-101", "FA26", "1", ["hernandez"], [m("TR", "10:30", "11:55")], 16),
+  s("oxy-fys-106", "FA26", "1", ["nguyen"], [m("MW", "13:30", "14:55")], 16),
+  s("oxy-fys-112", "FA26", "1", ["moreau"], [m("TR", "13:30", "14:55")], 16),
   // COMP 131 and MATH 120-01 deliberately overlap (MWF 10:30).
-  s("oxy-comp-131", "FA26", "01", ["kim"], [m("MWF", "10:30", "11:25", "Fowler 112")], 30),
-  s("oxy-comp-131", "FA26", "02", ["liu"], [m("MWF", "13:30", "14:25", "Fowler 112")], 30),
-  s("oxy-comp-229", "FA26", "01", ["kim"], [m("TR", "09:00", "10:25", "Fowler 112")], 28),
-  s("oxy-comp-390", "FA26", "01", ["liu"], [m("W", "15:00", "17:50", "Fowler 301")], 18),
-  s("oxy-math-120", "FA26", "01", ["petrova"], [m("MWF", "10:30", "11:25", "Fowler 309")], 32),
-  s("oxy-math-120", "FA26", "02", ["brooks"], [m("MWF", "09:35", "10:30", "Fowler 309")], 32),
-  s("oxy-math-212", "FA26", "01", ["brooks"], [m("TR", "10:30", "11:55", "Fowler 309")], 30),
-  s("oxy-math-214", "FA26", "01", ["petrova"], [m("MWF", "11:45", "12:40", "Fowler 307")], 30),
-  // PHYS 120 lab on Wednesday afternoon overlaps COMP 131-02 and FYS 106.
-  s("oxy-phys-120", "FA26", "01", ["tanaka"], [m("MWF", "08:30", "09:25", "Hameetman 115", "Lecture"), m("W", "13:30", "16:20", "Hameetman 130", "Lab")], 24),
-  s("oxy-phys-490", "FA26", "01", ["tanaka"], [m("F", "14:00", "15:30", "Hameetman 220")], 15),
-  s("oxy-chem-120", "FA26", "01", ["okafor"], [m("TR", "08:00", "09:25", "Hameetman 105", "Lecture"), m("T", "13:30", "16:20", "Hameetman 140", "Lab")], 40),
-  s("oxy-bio-110", "FA26", "01", ["okafor"], [m("MWF", "11:45", "12:40", "Bio 102", "Lecture"), m("R", "13:30", "16:20", "Bio 110", "Lab")], 36),
-  s("oxy-econ-101", "FA26", "01", ["rahman"], [m("MWF", "09:35", "10:30", "Johnson 102")], 40),
-  s("oxy-econ-250", "FA26", "01", ["ortiz"], [m("TR", "15:05", "16:30", "Johnson 102")], 25),
-  s("oxy-econ-395", "FA26", "01", ["rahman"], [m("R", "18:00", "20:50", "Johnson 301")], 16),
-  s("oxy-pols-230", "FA26", "01", ["mensah"], [m("MW", "15:05", "16:30", "Johnson 204")], 28),
-  s("oxy-dwa-101", "FA26", "01", ["mensah"], [m("TR", "09:00", "10:25", "Johnson 200")], 35),
-  s("oxy-hist-101", "FA26", "01", ["whitfield"], [m("MWF", "11:45", "12:40", "Swan 201")], 30),
+  // Labs with their own CRN, like counts lists COMP 131 (sections "1-1", "1-2", 0 units).
+  s("oxy-comp-131", "FA26", "1", ["kim"], [m("MWF", "10:30", "11:25")], 30),
+  lab("oxy-comp-131", "FA26", "1-1", ["kim"], m("T", "08:35", "11:25"), 18),
+  lab("oxy-comp-131", "FA26", "1-2", ["kim"], m("T", "13:20", "16:10"), 18),
+  s("oxy-comp-131", "FA26", "2", ["liu"], [m("MWF", "13:30", "14:25")], 30),
+  lab("oxy-comp-131", "FA26", "2-1", ["liu"], m("R", "08:35", "11:25"), 18),
+  s("oxy-comp-229", "FA26", "1", ["kim"], [m("TR", "09:00", "10:25")], 28),
+  s("oxy-comp-390", "FA26", "1", ["liu"], [m("W", "15:00", "17:50")], 18),
+  s("oxy-math-120", "FA26", "1", ["petrova"], [m("MWF", "10:30", "11:25")], 32),
+  s("oxy-math-120", "FA26", "2", ["brooks"], [m("MWF", "09:35", "10:30")], 32),
+  s("oxy-math-212", "FA26", "1", ["brooks"], [m("TR", "10:30", "11:55")], 30),
+  s("oxy-math-214", "FA26", "1", ["petrova"], [m("MWF", "11:45", "12:40")], 30),
+  // PHYS 120 lab 1-1 on Wednesday afternoon overlaps COMP 131-2 and FYS 106.
+  s("oxy-phys-120", "FA26", "1", ["tanaka"], [m("MWF", "08:30", "09:25")], 24),
+  lab("oxy-phys-120", "FA26", "1-1", ["tanaka"], m("W", "13:30", "16:20"), 12),
+  lab("oxy-phys-120", "FA26", "1-2", ["tanaka"], m("R", "13:30", "16:20"), 12),
+  // An extra weekly meeting under the SAME CRN, like PHYS 310 on counts (MWF + Tue).
+  s("oxy-phys-310", "FA26", "1", ["tanaka"], [m("MWF", "09:00", "09:55"), m("T", "10:05", "11:25")], 20),
+  s("oxy-phys-490", "FA26", "1", ["tanaka"], [m("F", "14:00", "15:30")], 15),
+  s("oxy-chem-120", "FA26", "1", ["okafor"], [m("TR", "08:00", "09:25")], 40),
+  lab("oxy-chem-120", "FA26", "1-1", ["okafor"], m("T", "13:30", "16:20"), 20),
+  lab("oxy-chem-120", "FA26", "1-2", ["okafor"], m("R", "13:30", "16:20"), 20),
+  s("oxy-bio-110", "FA26", "1", ["okafor"], [m("MWF", "11:45", "12:40", "Lecture"), m("R", "13:30", "16:20", "Lab")], 36),
+  s("oxy-econ-101", "FA26", "1", ["rahman"], [m("MWF", "09:35", "10:30")], 40),
+  s("oxy-econ-250", "FA26", "1", ["ortiz"], [m("TR", "15:05", "16:30")], 25),
+  s("oxy-econ-395", "FA26", "1", ["rahman"], [m("R", "18:00", "20:50")], 16),
+  s("oxy-pols-230", "FA26", "1", ["mensah"], [m("MW", "15:05", "16:30")], 28),
+  s("oxy-dwa-101", "FA26", "1", ["mensah"], [m("TR", "09:00", "10:25")], 35),
+  s("oxy-hist-101", "FA26", "1", ["whitfield"], [m("MWF", "11:45", "12:40")], 30),
   // ARTH 150 and HIST 270 partially overlap on Tue/Thu afternoons.
-  s("oxy-hist-270", "FA26", "01", ["goldberg"], [m("TR", "14:00", "15:25", "Swan 105")], 30),
-  s("oxy-arth-150", "FA26", "01", ["bianchi"], [m("TR", "13:30", "14:55", "Weingart 110")], 30),
-  s("oxy-arts-101", "FA26", "01", ["moreau"], [m("MW", "09:00", "11:50", "Studio A")], 14),
-  s("oxy-musc-101", "FA26", "01", ["chen"], [m("MWF", "13:30", "14:25", "Booth 201")], 35),
-  s("oxy-musc-140", "FA26", "01", ["chen"], [m("TR", "15:05", "16:30", "Booth 201")], 30),
-  s("oxy-engl-210", "FA26", "01", ["whitfield"], [m("TR", "10:30", "11:55", "Swan 302")], 25),
-  s("caltech-cs-1", "FA26", "01", ["feldman"], [m("MWF", "13:00", "13:55", "Annenberg 105")], 120, "FA"),
-  s("caltech-ma-2", "FA26", "01", ["kowalski"], [m("MWF", "10:00", "10:55", "Linde 310")], 80, "FA"),
-  s("caltech-ph-2", "FA26", "01", ["huang"], [m("MWF", "11:00", "11:55", "Bridge 201")], 90, "FA"),
-  s("caltech-ec-11", "FA26", "01", ["park"], [m("TR", "10:30", "11:55", "Baxter 25")], 60, "FA"),
+  s("oxy-hist-270", "FA26", "1", ["goldberg"], [m("TR", "14:00", "15:25")], 30),
+  s("oxy-arth-150", "FA26", "1", ["bianchi"], [m("TR", "13:30", "14:55")], 30),
+  s("oxy-arts-101", "FA26", "1", ["moreau"], [m("MW", "09:00", "11:50")], 14),
+  s("oxy-musc-101", "FA26", "1", ["chen"], [m("MWF", "13:30", "14:25")], 35),
+  s("oxy-musc-140", "FA26", "1", ["chen"], [m("TR", "15:05", "16:30")], 30),
+  s("oxy-engl-210", "FA26", "1", ["whitfield"], [m("TR", "10:30", "11:55")], 25),
+  s("caltech-cs-1", "FA26", "1", ["feldman"], [m("MWF", "13:00", "13:55")], 120, "FA"),
+  s("caltech-ma-2", "FA26", "1", ["kowalski"], [m("MWF", "10:00", "10:55")], 80, "FA"),
+  s("caltech-ph-2", "FA26", "1", ["huang"], [m("MWF", "11:00", "11:55")], 90, "FA"),
+  s("caltech-ec-11", "FA26", "1", ["park"], [m("TR", "10:30", "11:55")], 60, "FA"),
 
   // ===== Spring 2027 (future) =====
-  s("oxy-fys-106", "SP27", "01", ["nguyen"], [m("TR", "09:00", "10:25", "Fowler 110")], 16),
-  s("oxy-comp-131", "SP27", "01", ["liu"], [m("MWF", "10:30", "11:25", "Fowler 112")], 30),
-  s("oxy-comp-229", "SP27", "01", ["kim"], [m("MWF", "13:30", "14:25", "Fowler 112")], 28),
-  s("oxy-comp-490", "SP27", "01", ["kim"], [m("W", "15:00", "17:50", "Fowler 301")], 18),
-  s("oxy-math-120", "SP27", "01", ["brooks"], [m("MWF", "09:35", "10:30", "Fowler 309")], 32),
-  s("oxy-math-212", "SP27", "01", ["petrova"], [m("MWF", "10:30", "11:25", "Fowler 309")], 30),
-  s("oxy-math-214", "SP27", "01", ["brooks"], [m("TR", "10:30", "11:55", "Fowler 307")], 30),
-  s("oxy-math-395", "SP27", "01", ["petrova"], [m("R", "15:05", "17:50", "Fowler 301")], 15),
-  s("oxy-phys-220", "SP27", "01", ["tanaka"], [m("MWF", "08:30", "09:25", "Hameetman 115", "Lecture"), m("R", "13:30", "16:20", "Hameetman 130", "Lab")], 24),
-  s("oxy-chem-120", "SP27", "01", ["okafor"], [m("TR", "08:00", "09:25", "Hameetman 105", "Lecture"), m("W", "13:30", "16:20", "Hameetman 140", "Lab")], 40),
-  s("oxy-econ-250", "SP27", "01", ["ortiz"], [m("MW", "15:05", "16:30", "Johnson 102")], 25),
-  s("oxy-hist-380", "SP27", "01", ["goldberg"], [m("T", "15:05", "17:50", "Swan 301")], 15),
-  s("oxy-arth-202", "SP27", "01", ["bianchi"], [m("MW", "13:30", "14:55", "Weingart 110")], 30),
-  s("oxy-musc-140", "SP27", "01", ["chen"], [m("TR", "13:30", "14:55", "Booth 201")], 30),
-  s("oxy-engl-210", "SP27", "01", ["whitfield"], [m("MWF", "11:45", "12:40", "Swan 302")], 25),
-  s("oxy-pols-230", "SP27", "01", ["mensah"], [m("TR", "10:30", "11:55", "Johnson 204")], 28),
-  s("oxy-dwa-101", "SP27", "01", ["rahman", "mensah"], [m("MWF", "09:35", "10:30", "Johnson 200")], 35),
-  s("caltech-ee-44", "SP27", "01", ["feldman"], [m("MWF", "14:00", "14:55", "Moore 80")], 70, "WI"),
-  s("caltech-me-11", "SP27", "01", ["huang"], [m("TR", "09:00", "10:25", "Gates 104")], 60, "WI"),
-  s("caltech-ph-2", "SP27", "01", ["huang"], [m("MWF", "11:00", "11:55", "Bridge 201")], 90, "SP"),
-  s("caltech-ma-2", "SP27", "01", ["kowalski"], [m("TR", "13:00", "14:25", "Linde 310")], 80, "SP"),
+  s("oxy-fys-106", "SP27", "1", ["nguyen"], [m("TR", "09:00", "10:25")], 16),
+  s("oxy-comp-131", "SP27", "1", ["liu"], [m("MWF", "10:30", "11:25")], 30),
+  lab("oxy-comp-131", "SP27", "1-1", ["liu"], m("T", "08:35", "11:25"), 18),
+  s("oxy-comp-229", "SP27", "1", ["kim"], [m("MWF", "13:30", "14:25")], 28),
+  s("oxy-comp-490", "SP27", "1", ["kim"], [m("W", "15:00", "17:50")], 18),
+  s("oxy-math-120", "SP27", "1", ["brooks"], [m("MWF", "09:35", "10:30")], 32),
+  s("oxy-math-212", "SP27", "1", ["petrova"], [m("MWF", "10:30", "11:25")], 30),
+  s("oxy-math-214", "SP27", "1", ["brooks"], [m("TR", "10:30", "11:55")], 30),
+  s("oxy-math-395", "SP27", "1", ["petrova"], [m("R", "15:05", "17:50")], 15),
+  s("oxy-phys-220", "SP27", "1", ["tanaka"], [m("MWF", "08:30", "09:25")], 24),
+  lab("oxy-phys-220", "SP27", "1-1", ["tanaka"], m("R", "13:30", "16:20"), 12),
+  s("oxy-chem-120", "SP27", "1", ["okafor"], [m("TR", "08:00", "09:25")], 40),
+  lab("oxy-chem-120", "SP27", "1-1", ["okafor"], m("W", "13:30", "16:20"), 20),
+  s("oxy-econ-250", "SP27", "1", ["ortiz"], [m("MW", "15:05", "16:30")], 25),
+  s("oxy-hist-380", "SP27", "1", ["goldberg"], [m("T", "15:05", "17:50")], 15),
+  s("oxy-arth-202", "SP27", "1", ["bianchi"], [m("MW", "13:30", "14:55")], 30),
+  s("oxy-musc-140", "SP27", "1", ["chen"], [m("TR", "13:30", "14:55")], 30),
+  s("oxy-engl-210", "SP27", "1", ["whitfield"], [m("MWF", "11:45", "12:40")], 25),
+  s("oxy-pols-230", "SP27", "1", ["mensah"], [m("TR", "10:30", "11:55")], 28),
+  s("oxy-dwa-101", "SP27", "1", ["rahman", "mensah"], [m("MWF", "09:35", "10:30")], 35),
+  s("caltech-ee-44", "SP27", "1", ["feldman"], [m("MWF", "14:00", "14:55")], 70, "WI"),
+  s("caltech-me-11", "SP27", "1", ["huang"], [m("TR", "09:00", "10:25")], 60, "WI"),
+  s("caltech-ph-2", "SP27", "1", ["huang"], [m("MWF", "11:00", "11:55")], 90, "SP"),
+  s("caltech-ma-2", "SP27", "1", ["kowalski"], [m("TR", "13:00", "14:25")], 80, "SP"),
 
   // ===== Spring 2026 (past) =====
-  s("oxy-comp-131", "SP26", "01", ["kim"], [m("MWF", "10:30", "11:25", "Fowler 112")], 30),
-  s("oxy-math-120", "SP26", "01", ["brooks"], [m("MWF", "09:35", "10:30", "Fowler 309")], 32),
-  s("oxy-hist-270", "SP26", "01", ["goldberg"], [m("TR", "13:30", "14:55", "Swan 105")], 30),
-  s("oxy-arts-101", "SP26", "01", ["moreau"], [m("TR", "09:00", "11:50", "Studio A")], 14),
-  s("caltech-cs-1", "SP26", "01", ["feldman"], [m("MWF", "13:00", "13:55", "Annenberg 105")], 120, "WI"),
+  s("oxy-comp-131", "SP26", "1", ["kim"], [m("MWF", "10:30", "11:25")], 30),
+  s("oxy-math-120", "SP26", "1", ["brooks"], [m("MWF", "09:35", "10:30")], 32),
+  s("oxy-hist-270", "SP26", "1", ["goldberg"], [m("TR", "13:30", "14:55")], 30),
+  s("oxy-arts-101", "SP26", "1", ["moreau"], [m("TR", "09:00", "11:50")], 14),
+  s("caltech-cs-1", "SP26", "1", ["feldman"], [m("MWF", "13:00", "13:55")], 120, "WI"),
 ];
 
 export const SECTION_BY_ID = Object.fromEntries(SECTIONS.map((x) => [x.id, x])) as Record<string, Section>;

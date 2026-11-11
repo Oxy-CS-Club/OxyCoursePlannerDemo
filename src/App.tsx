@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 import { CollectionsPage } from "./pages/CollectionsPage";
 import { CourseDetailPage } from "./pages/CourseDetailPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MyCoursesPage } from "./pages/MyCoursesPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { RatingsPlaceholderPage } from "./pages/RatingsPlaceholderPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/collections" element={<CollectionsPage />} />
         <Route path="/visualizer" element={<VisualizerPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/my-courses" element={<MyCoursesPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
