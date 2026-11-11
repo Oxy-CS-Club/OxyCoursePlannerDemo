@@ -194,6 +194,7 @@ export function SearchPage() {
                   </span>
                   <span className="text-stone-800">{sectionTitle(section)}</span>
                   {section.isLab && <TagBadge text="Lab · own CRN" />}
+                  {course.cores.includes("CFAP") && <TagBadge text={`Partial: ${course.units} unit${course.units === 1 ? "" : "s"} toward the 4 for Fine Arts`} />}
                   <QuarterBadge quarter={section.caltechQuarter} />
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-stone-600">

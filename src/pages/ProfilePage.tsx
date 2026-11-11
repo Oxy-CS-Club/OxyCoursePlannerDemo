@@ -5,9 +5,8 @@ import { courseCode, getCourse, listCourses } from "../api/catalog";
 import { CoreBadge, InstitutionBadge } from "../components/Badges";
 import { Combobox, type Option } from "../components/Combobox";
 import { HISTORY_TERMS } from "../data/catalog";
-import { CORES } from "../data/cores";
 import { MAJOR_BY_ID, MAJORS } from "../data/majors";
-import { satisfiedCores } from "../lib/recommend";
+import { coreProgress } from "../lib/recommend";
 import { useApp } from "../state/AppContext";
 import type { Profile } from "../types";
 
@@ -26,7 +25,7 @@ export function ProfilePage() {
 
   const majorOptions: Option[] = MAJORS.map((m) => ({ value: m.id, label: m.name, group: m.threeTwo ? "3-2 Engineering tracks" : "Majors" }));
   const courseOptions: Option[] = listCourses().map((c) => ({ value: c.id, label: `${courseCode(c)} — ${c.title}`, hint: c.institution }));
-  const have = satisfiedCores(p.history);
+  const progress = coreProgress(p);
 
   return (
     <div className="max-w-3xl">
@@ -147,14 +146,30 @@ export function ProfilePage() {
 
         <h3 className="mt-5 mb-2 text-sm font-semibold">Core progress (from your history)</h3>
         <ul className="grid gap-1 sm:grid-cols-2">
-          {CORES.map((c) => (
+          {progress.map((c) => (
             <li key={c.code} className="flex items-center gap-2 text-sm">
-              <span className={have.has(c.code) ? "text-emerald-600" : "text-stone-300"}>{have.has(c.code) ? "✔" : "○"}</span>
+              <span className={c.done ? "text-emerald-600" : "text-stone-300"}>{c.done ? "✔" : "○"}</span>
               <CoreBadge code={c.code} />
-              <span className={have.has(c.code) ? "" : "text-stone-500"}>{c.name}</span>
+              <span className={c.done ? "" : "text-stone-500"}>{c.name}</span>
+              {c.detail && <span className="text-xs text-stone-400">{c.detail}</span>}
             </li>
           ))}
         </ul>
+        <p className="mt-2 text-xs text-stone-500">
+          Fine Arts needs 4 units: one 4-unit Fine Arts course, or partial (1–2 unit) arts courses that add up to 4. Language Proficiency needs two language courses, unless
+          you passed the exemption test.
+        </p>
+        <label className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">Language requirement</span>
+          <select
+            value={p.langExempt ? "exempt" : "courses"}
+            onChange={(e) => updateProfile({ langExempt: e.target.value === "exempt" })}
+            className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm"
+          >
+            <option value="courses">Complete with 2 language courses</option>
+            <option value="exempt">I passed the language exemption test</option>
+          </select>
+        </label>
       </div>
 
       <p className="mt-4 text-sm text-stone-500">

@@ -5,7 +5,8 @@ export type Day = "M" | "T" | "W" | "R" | "F";
 export type CaltechQuarter = "FA" | "WI" | "SP";
 export type TermStatus = "past" | "current" | "future";
 
-export type CoreCode = "USD" | "RF" | "GC" | "CPPE" | "CPFA" | "CPMS" | "CPLS";
+/** Official Core area codes on counts.oxy.edu. CFAP = Core Arts Partial, LANG = Core Language Proficiency. */
+export type CoreCode = "CPUD" | "CPRF" | "CPGC" | "CPPE" | "CPFA" | "CFAP" | "CPMS" | "CPLS" | "LANG";
 
 export interface CoreCategory {
   code: CoreCode;
@@ -117,6 +118,8 @@ export interface Profile {
   /** Students can declare more than one major (double major, major + 3-2 track, …). */
   majorIds: string[];
   history: HistoryEntry[];
+  /** Passed the language exemption test, so the Language Proficiency requirement is met without courses. */
+  langExempt: boolean;
 }
 
 export interface HistoryEntry {

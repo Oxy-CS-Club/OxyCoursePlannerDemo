@@ -20,6 +20,10 @@ export interface SearchFilters {
   timeMode?: "inside" | "overlap";
 }
 
+/** Choosing Fine Arts also finds Fine Arts partial (CFAP) courses; every other code matches exactly. */
+export const matchesCore = (course: Course, code: CoreCode) =>
+  course.cores.includes(code) || (code === "CPFA" && course.cores.includes("CFAP"));
+
 export const hasTimeFilter = (f: Pick<SearchFilters, "days" | "timeFrom" | "timeTo">) =>
   Boolean(f.days?.length || f.timeFrom || f.timeTo);
 
@@ -56,7 +60,7 @@ export function searchSections(f: SearchFilters): SectionResult[] {
     .filter(({ section, course }) => {
       if (f.institution && f.institution !== "All" && course.institution !== f.institution) return false;
       if (f.dept && course.dept !== f.dept) return false;
-      if (f.cores?.length && !f.cores.every((c) => course.cores.includes(c))) return false;
+      if (f.cores?.length && !f.cores.every((c) => matchesCore(course, c))) return false;
       if (f.instructorId && !section.instructorIds.includes(f.instructorId)) return false;
       if (!matchesTime(section, f)) return false;
       if (f.keyword?.trim()) {

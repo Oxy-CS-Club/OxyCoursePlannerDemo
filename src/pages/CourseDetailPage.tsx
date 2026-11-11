@@ -37,7 +37,7 @@ export function CourseDetailPage() {
             {course.cores.map((c) => (
               <CoreBadge key={c} code={c} />
             ))}
-            <span className="ml-1 text-xs text-stone-500">Satisfies: {course.cores.map((c) => CORE_BY_CODE[c].name).join(", ")}</span>
+            <span className="ml-1 text-xs text-stone-500">Satisfies: {course.cores.map((c) => (c === "CFAP" ? `Fine Arts (partial: ${course.units} of the 4 units)` : CORE_BY_CODE[c].name)).join(", ")}</span>
           </div>
         )}
         <p className="mt-4 text-stone-700">{course.description}</p>

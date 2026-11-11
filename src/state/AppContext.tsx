@@ -10,7 +10,7 @@ const GUEST_KEY = "ocp:guest";
 const USER_KEY = "ocp:user";
 const dataKey = (email: string) => `ocp:data:${email}`;
 
-const emptyProfile = (): Profile => ({ year: null, majorIds: [], history: [] });
+const emptyProfile = (): Profile => ({ year: null, majorIds: [], history: [], langExempt: false });
 
 /** Upgrade data saved by older demo versions so nothing breaks after an update. */
 function migrate(d: UserData | null): UserData | null {
@@ -28,6 +28,7 @@ function migrate(d: UserData | null): UserData | null {
   d.finalSchedules ??= {};
   Object.values(d.finalSchedules).forEach((f) => (f.sectionIds = fix(f.sectionIds)));
   d.locations ??= {};
+  p.langExempt ??= false;
   return d;
 }
 const emptyData = (): UserData => ({ collections: [], schedules: [], activeScheduleByTerm: {}, profile: emptyProfile(), finalSchedules: {}, locations: {} });
