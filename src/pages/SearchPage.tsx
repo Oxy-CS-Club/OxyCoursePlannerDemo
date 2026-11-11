@@ -40,7 +40,7 @@ export function SearchPage() {
         .map((d) => ({ value: d.code, label: d.isSubject ? `${d.name} (FYS)` : `${d.name} (${d.code})`, hint: d.institution, group: d.institution === "Oxy" ? "Occidental" : "Caltech" })),
     [institution],
   );
-  const coreOptions: Option[] = CORES.map((c) => ({ value: c.code, label: c.name, hint: c.group ?? "" }));
+  const coreOptions: Option[] = CORES.map((c) => ({ value: c.code, label: c.name }));
   const profOptions: Option[] = listInstructors().map((i) => ({ value: i.id, label: i.name, hint: i.institution }));
 
   const cores = [core1, core2].filter(Boolean) as CoreCode[];
