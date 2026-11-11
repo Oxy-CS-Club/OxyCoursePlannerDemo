@@ -3,7 +3,7 @@
 //  - Logged-in users: localStorage keyed by email → data is there next time.
 // In the real app the logged-in branch becomes API calls to the backend.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { TERMS } from "../data/catalog";
+import { SECTION_BY_ID, TERMS } from "../data/catalog";
 import type { Collection, Profile, Schedule, User, UserData } from "../types";
 
 const GUEST_KEY = "ocp:guest";
@@ -12,15 +12,25 @@ const dataKey = (email: string) => `ocp:data:${email}`;
 
 const emptyProfile = (): Profile => ({ year: null, majorIds: [], history: [] });
 
-/** Upgrade data saved by older demo versions (single `majorId`) to `majorIds`. */
+/** Upgrade data saved by older demo versions so nothing breaks after an update. */
 function migrate(d: UserData | null): UserData | null {
   if (!d) return d;
-  const p = d.profile as Profile & { majorId?: string | null };
+  const p = d.profile as Profile & { majorId?: string | null; history: unknown[] };
   if (!Array.isArray(p.majorIds)) p.majorIds = p.majorId ? [p.majorId] : [];
   delete p.majorId;
+  // History used to be plain course ids; now each entry also has a term.
+  p.history = (p.history ?? []).map((h) => (typeof h === "string" ? { courseId: h, termId: "FA25" } : h)) as Profile["history"];
+  // Section numbers changed from "01" to "1" (counts style); drop ids that no longer exist.
+  const fix = (ids: string[]) =>
+    ids.map((id) => (SECTION_BY_ID[id] ? id : id.replace(/-0(\d)$/, "-$1"))).filter((id) => SECTION_BY_ID[id]);
+  d.collections?.forEach((c) => (c.sectionIds = fix(c.sectionIds)));
+  d.schedules?.forEach((s) => (s.sectionIds = fix(s.sectionIds)));
+  d.finalSchedules ??= {};
+  Object.values(d.finalSchedules).forEach((f) => (f.sectionIds = fix(f.sectionIds)));
+  d.locations ??= {};
   return d;
 }
-const emptyData = (): UserData => ({ collections: [], schedules: [], activeScheduleByTerm: {}, profile: emptyProfile() });
+const emptyData = (): UserData => ({ collections: [], schedules: [], activeScheduleByTerm: {}, profile: emptyProfile(), finalSchedules: {}, locations: {} });
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 function read<T>(store: Storage, key: string): T | null {
@@ -76,6 +86,10 @@ interface AppState {
   removeFromSchedule: (sectionId: string) => void;
   // profile
   updateProfile: (p: Partial<Profile>) => void;
+  // final schedules + user-entered rooms
+  setFinalSchedule: (termId: string, schedule: Schedule) => void;
+  removeFinalSchedule: (termId: string) => void;
+  setLocation: (key: string, value: string) => void;
   resetDemo: () => void;
 }
 
@@ -234,6 +248,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateProfile: (p) =>
       update((d) => {
         d.profile = { ...d.profile, ...p };
+        return d;
+      }),
+    setFinalSchedule: (termId, schedule) =>
+      update((d) => {
+        d.finalSchedules[termId] = { name: schedule.name, sectionIds: [...schedule.sectionIds], finalizedAt: new Date().toISOString() };
+        return d;
+      }),
+    removeFinalSchedule: (termId) =>
+      update((d) => {
+        delete d.finalSchedules[termId];
+        return d;
+      }),
+    setLocation: (key, value) =>
+      update((d) => {
+        if (value.trim()) d.locations[key] = value.trim();
+        else delete d.locations[key];
         return d;
       }),
     resetDemo: () => {

@@ -2,8 +2,11 @@
 // side by side and highlighted, so students can compare before dropping one.
 import { useMemo, useState, type DragEvent } from "react";
 import { Link } from "react-router-dom";
-import { courseCode, getCourse } from "../api/catalog";
+import { courseCode, getCourse, locationKey, sectionTitle, sectionUnits } from "../api/catalog";
 import { InstitutionBadge, QuarterBadge } from "../components/Badges";
+import { CalendarActions } from "../components/CalendarActions";
+import { LocationEditor } from "../components/LocationEditor";
+import { buildIcs, downloadIcs, safeFilename } from "../lib/calendar";
 import { QUARTER_NAMES, SECTION_BY_ID, TERM_BY_ID } from "../data/catalog";
 import { layoutDay, type CalEvent } from "../lib/overlap";
 import { DAY_NAMES, DAYS, fmtMeeting, fmtTime, toMinutes } from "../lib/time";
@@ -67,7 +70,7 @@ export function VisualizerPage() {
     const s = SECTION_BY_ID[sid];
     return `${courseCode(getCourse(s.courseId))}-${s.sectionNo}`;
   };
-  const totalUnits = scheduled.reduce((sum, sid) => sum + (SECTION_BY_ID[sid] ? getCourse(SECTION_BY_ID[sid].courseId).units : 0), 0);
+  const totalUnits = scheduled.reduce((sum, sid) => sum + (SECTION_BY_ID[sid] ? sectionUnits(SECTION_BY_ID[sid]) : 0), 0);
   const hasCaltech = scheduled.some((sid) => SECTION_BY_ID[sid]?.caltechQuarter);
 
   const onDrop = (e: DragEvent) => {
@@ -209,7 +212,9 @@ export function VisualizerPage() {
                     const top = ((toMinutes(ev.start) - START_HOUR * 60) / 60) * HOUR_PX;
                     const height = ((toMinutes(ev.end) - toMinutes(ev.start)) / 60) * HOUR_PX;
                     const width = 100 / ev.columns;
-                    const mt = s.meetings.find((x) => x.start === ev.start && x.days.includes(d));
+                    const mi = s.meetings.findIndex((x) => x.start === ev.start && x.days.includes(d));
+                    const mt = s.meetings[mi];
+                    const room = data.locations[locationKey(s.id, mi)];
                     return (
                       <div
                         key={ev.key}
@@ -224,7 +229,7 @@ export function VisualizerPage() {
                         <div className="truncate">
                           {fmtTime(ev.start)}–{fmtTime(ev.end)}
                         </div>
-                        {height > 50 && <div className="truncate opacity-75">{mt?.kind ? `${mt.kind} · ` : ""}{mt?.location}</div>}
+                        {height > 50 && <div className="truncate opacity-75">{[s.isLab ? "Lab" : mt?.kind, room].filter(Boolean).join(" · ")}</div>}
                         <button
                           onClick={() => app.removeFromSchedule(ev.sectionId)}
                           className="absolute right-0.5 bottom-0.5 hidden rounded bg-white/80 px-1 text-[10px] text-stone-700 hover:bg-white group-hover:block"
@@ -249,16 +254,42 @@ export function VisualizerPage() {
               <div className="mb-2 font-semibold">
                 On this schedule · {totalUnits} units
               </div>
-              <ul className="flex flex-wrap gap-2">
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-stone-50 p-2">
+                <button
+                  onClick={() =>
+                    downloadIcs(
+                      safeFilename(`${term.name}-${activeSchedule?.name ?? "schedule"}`),
+                      buildIcs(scheduled.map((sid) => SECTION_BY_ID[sid]), `${term.name} · ${activeSchedule?.name ?? "Schedule"}`, data.locations),
+                    )
+                  }
+                  className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-stone-700"
+                >
+                  ⤓ Download schedule (.ics)
+                </button>
+                <span className="text-xs text-stone-500">
+                  Import into Apple Calendar or Google Calendar, or add classes one by one to Google Calendar below. Counts doesn't list classrooms, so add rooms below if you want them in the export. If you add a room in Google Calendar instead, choose "All events" so every week updates.
+                </span>
+                {conflicts.length > 0 && (
+                  <span className="w-full text-xs font-medium text-red-700">⚠ This schedule still has conflicts. Every course on it will be exported, so remove the ones you'll drop first.</span>
+                )}
+              </div>
+              <ul className="space-y-1.5">
                 {scheduled.map((sid) => (
-                  <li key={sid} className={`flex items-center gap-1 rounded-lg border-l-4 px-2 py-1 text-xs ${colorOf(sid)}`}>
-                    <Link to={`/course/${SECTION_BY_ID[sid].courseId}`} className="font-semibold hover:underline">
-                      {label(sid)}
-                    </Link>
-                    <QuarterBadge quarter={SECTION_BY_ID[sid].caltechQuarter} />
-                    <button onClick={() => app.removeFromSchedule(sid)} className="ml-1 text-stone-500 hover:text-red-600" aria-label={`Remove ${label(sid)}`}>
-                      ✕
-                    </button>
+                  <li key={sid} className={`space-y-1.5 rounded-lg border-l-4 px-2 py-1.5 text-xs ${colorOf(sid)}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link to={`/course/${SECTION_BY_ID[sid].courseId}`} className="font-semibold hover:underline">
+                        {label(sid)}
+                      </Link>
+                      <span className="opacity-75">{sectionTitle(SECTION_BY_ID[sid])}</span>
+                      <QuarterBadge quarter={SECTION_BY_ID[sid].caltechQuarter} />
+                      <div className="ml-auto flex items-center gap-2">
+                        <CalendarActions section={SECTION_BY_ID[sid]} showIcs={false} />
+                        <button onClick={() => app.removeFromSchedule(sid)} className="text-stone-500 hover:text-red-600" aria-label={`Remove ${label(sid)}`}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <LocationEditor section={SECTION_BY_ID[sid]} />
                   </li>
                 ))}
               </ul>
@@ -267,6 +298,39 @@ export function VisualizerPage() {
         </section>
       </div>
     </div>
+  );
+}
+
+function FinalScheduleButton() {
+  const { user, data, termId, activeSchedule, setFinalSchedule } = useApp();
+  const term = TERM_BY_ID[termId];
+  if (!user) {
+    return (
+      <Link to="/login" className="rounded-lg border border-dashed border-stone-400 px-2.5 py-1.5 text-stone-500 hover:border-orange-400" title="Sign in to save a final schedule">
+        ★ Sign in to save a final schedule
+      </Link>
+    );
+  }
+  if (!activeSchedule || activeSchedule.sectionIds.length === 0) return null;
+  const final = data.finalSchedules[termId];
+  const same = final && final.sectionIds.length === activeSchedule.sectionIds.length && final.sectionIds.every((id) => activeSchedule.sectionIds.includes(id));
+  if (same) {
+    return (
+      <Link to="/my-courses" className="rounded-lg bg-emerald-100 px-2.5 py-1.5 font-medium text-emerald-800 hover:bg-emerald-200" title="This schedule is your final schedule. View it on My Courses.">
+        Final ✓
+      </Link>
+    );
+  }
+  return (
+    <button
+      onClick={() => {
+        if (final && !confirm(`Replace your final schedule for ${term.name} ("${final.name}") with "${activeSchedule.name}"?`)) return;
+        setFinalSchedule(termId, activeSchedule);
+      }}
+      className="rounded-lg bg-emerald-600 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-700"
+    >
+      ★ {final ? "Update final schedule" : "Use this as the final schedule"}
+    </button>
   );
 }
 
@@ -316,6 +380,7 @@ function ScheduleBar() {
           </button>
         </>
       )}
+      <FinalScheduleButton />
     </div>
   );
 }

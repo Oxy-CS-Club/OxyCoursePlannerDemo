@@ -11,15 +11,15 @@ export interface RecGroup {
   courses: Course[];
 }
 
-export function satisfiedCores(history: string[]): Set<CoreCode> {
+export function satisfiedCores(history: Profile["history"]): Set<CoreCode> {
   const set = new Set<CoreCode>();
-  history.forEach((id) => COURSE_BY_ID[id]?.cores.forEach((c) => set.add(c)));
+  history.forEach((h) => COURSE_BY_ID[h.courseId]?.cores.forEach((c) => set.add(c)));
   return set;
 }
 
 export function recommend(profile: Profile, termId: string): RecGroup[] {
   const offered = new Set(SECTIONS.filter((s) => s.termId === termId).map((s) => s.courseId));
-  const taken = new Set(profile.history);
+  const taken = new Set(profile.history.map((h) => h.courseId));
   const available = (ids: string[]) =>
     ids.filter((id) => offered.has(id) && !taken.has(id)).map((id) => COURSE_BY_ID[id]).filter(Boolean);
   const groups: RecGroup[] = [];

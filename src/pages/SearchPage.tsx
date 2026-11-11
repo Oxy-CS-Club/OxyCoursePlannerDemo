@@ -1,15 +1,22 @@
 // Spec §3.1: term + department (incl. FYS subject) + up to 2 Cores (AND) + professor + keyword + institution.
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { courseCode, instructorNames, listDepartments, listInstructors, searchSections } from "../api/catalog";
+import { courseCode, hasTimeFilter, instructorNames, listDepartments, listInstructors, searchSections, sectionTitle, sectionUnits } from "../api/catalog";
 import { CoreBadge, InstitutionBadge, QuarterBadge, TagBadge } from "../components/Badges";
 import { Combobox, type Option } from "../components/Combobox";
 import { FavoriteButton } from "../components/FavoriteButton";
 import { TERM_BY_ID } from "../data/catalog";
 import { CORES } from "../data/cores";
-import { fmtMeeting } from "../lib/time";
+import { DAY_NAMES, DAYS, fmtMeeting, fmtTime } from "../lib/time";
 import { useApp } from "../state/AppContext";
-import type { CoreCode, Institution } from "../types";
+import type { CoreCode, Day, Institution } from "../types";
+
+// Time picker options: every 30 minutes, 7:00am–10:00pm. Hint shows 24h time so "14" also matches.
+const TIME_OPTIONS: Option[] = Array.from({ length: 31 }, (_, i) => {
+  const mins = 7 * 60 + i * 30;
+  const v = `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+  return { value: v, label: fmtTime(v), hint: v };
+});
 
 const TAG_LABEL = { fys: "First-Year Seminar", "junior-seminar": "Junior seminar", "senior-seminar": "Senior seminar" } as const;
 
@@ -21,6 +28,10 @@ export function SearchPage() {
   const [prof, setProf] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [institution, setInstitution] = useState<Institution | "All">("All");
+  const [days, setDays] = useState<Day[]>([]);
+  const [timeFrom, setTimeFrom] = useState<string | null>(null);
+  const [timeTo, setTimeTo] = useState<string | null>(null);
+  const [timeMode, setTimeMode] = useState<"inside" | "overlap">("inside");
 
   const deptOptions: Option[] = useMemo(
     () =>
@@ -33,9 +44,12 @@ export function SearchPage() {
   const profOptions: Option[] = listInstructors().map((i) => ({ value: i.id, label: i.name, hint: i.institution }));
 
   const cores = [core1, core2].filter(Boolean) as CoreCode[];
-  const results = searchSections({ termId, dept, cores, instructorId: prof, keyword, institution });
+  const results = searchSections({ termId, dept, cores, instructorId: prof, keyword, institution, days, timeFrom, timeTo, timeMode });
+  const timeActive = hasTimeFilter({ days, timeFrom, timeTo });
   // The school toggle only narrows a search; on its own it doesn't count as one.
-  const anyFilter = Boolean(dept || cores.length || prof || keyword.trim());
+  const anyFilter = Boolean(dept || cores.length || prof || keyword.trim() || timeActive);
+  const toOptions = timeFrom ? TIME_OPTIONS.filter((o) => o.value > timeFrom) : TIME_OPTIONS;
+  const fromOptions = timeTo ? TIME_OPTIONS.filter((o) => o.value < timeTo) : TIME_OPTIONS;
 
   return (
     <div>
@@ -79,13 +93,65 @@ export function SearchPage() {
         <Combobox label="Core 1" options={coreOptions} value={core1} onChange={setCore1} placeholder="Any Core" disabledValues={core2 ? [core2] : []} />
         <Combobox label="Core 2 (must match both)" options={coreOptions} value={core2} onChange={setCore2} placeholder="Optional 2nd Core" disabledValues={core1 ? [core1] : []} />
         <Combobox label="Professor" options={profOptions} value={prof} onChange={setProf} placeholder='Try "hern" or "chen"' />
+
+        {/* Search by time */}
+        <div className="flex flex-wrap items-end gap-3 border-t border-stone-100 pt-3 sm:col-span-2 lg:col-span-5">
+          <div>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">Time · days</span>
+            <div className="flex gap-1" role="group" aria-label="Days">
+              {DAYS.map((d) => {
+                const on = days.includes(d);
+                return (
+                  <button
+                    key={d}
+                    aria-pressed={on}
+                    onClick={() => setDays(on ? days.filter((x) => x !== d) : DAYS.filter((x) => x === d || days.includes(x)))}
+                    className={`w-11 rounded-lg border py-2 text-sm ${on ? "border-orange-500 bg-orange-600 text-white" : "border-stone-300 bg-white hover:border-orange-400"}`}
+                  >
+                    {DAY_NAMES[d]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="w-36">
+            <Combobox label="From" options={fromOptions} value={timeFrom} onChange={setTimeFrom} placeholder="Any time" />
+          </div>
+          <div className="w-36">
+            <Combobox label="To" options={toOptions} value={timeTo} onChange={setTimeTo} placeholder="Any time" />
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">Match</span>
+            <div className="flex rounded-lg border border-stone-300 bg-white p-0.5 text-sm" role="group" aria-label="Time match mode">
+              {(
+                [
+                  ["inside", "Fully inside"],
+                  ["overlap", "Overlaps"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  aria-pressed={timeMode === v}
+                  onClick={() => setTimeMode(v)}
+                  title={v === "inside" ? "Every meeting is on the chosen days and within the time window" : "At least one meeting touches the time window on a chosen day"}
+                  className={`rounded-md px-3 py-1.5 ${timeMode === v ? "bg-stone-900 text-white" : "text-stone-600 hover:text-stone-900"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="pb-2 text-xs text-stone-400">
+            {timeMode === "inside" ? "Shows classes that fit entirely in the days and hours you pick." : "Shows classes that meet at least partly in the days and hours you pick."}
+          </p>
+        </div>
       </div>
 
       {/* Nothing is listed until the user sets at least one search condition. */}
       {!anyFilter ? (
         <div className="rounded-xl border border-dashed border-stone-300 p-10 text-center text-stone-500">
           <p className="font-medium text-stone-700">Start a search to see courses</p>
-          <p className="mt-1 text-sm">Type a keyword, or pick a department, a Core, or a professor above.</p>
+          <p className="mt-1 text-sm">Type a keyword, or pick a department, a Core, a professor, or a time above.</p>
         </div>
       ) : (
       <>
@@ -104,6 +170,10 @@ export function SearchPage() {
               setProf(null);
               setKeyword("");
               setInstitution("All");
+              setDays([]);
+              setTimeFrom(null);
+              setTimeTo(null);
+              setTimeMode("inside");
             }}
           >
             Clear filters
@@ -122,20 +192,16 @@ export function SearchPage() {
                     {courseCode(course)}
                     <span className="text-stone-400">-{section.sectionNo}</span>
                   </span>
-                  <span className="text-stone-800">{course.title}</span>
+                  <span className="text-stone-800">{sectionTitle(section)}</span>
+                  {section.isLab && <TagBadge text="Lab · own CRN" />}
                   <QuarterBadge quarter={section.caltechQuarter} />
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-stone-600">
                   <span>{instructorNames(section)}</span>
-                  {section.meetings.map((mt, i) => (
-                    <span key={i}>
-                      {fmtMeeting(mt)} · {mt.location}
-                    </span>
-                  ))}
-                  <span>{course.units} units</span>
-                  <span title="Live remaining seats are a planned future feature.">
-                    Capacity {section.capacity} · remaining <span className="text-stone-400">—</span>
-                  </span>
+                  <span>{section.meetings.map(fmtMeeting).join(" + ")}</span>
+                  <span>{sectionUnits(section)} units</span>
+                  <span>Max seats {section.capacity}</span>
+                  <span>CRN {section.crn}</span>
                 </div>
                 {(course.cores.length > 0 || course.tags.length > 0) && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
