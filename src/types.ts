@@ -30,6 +30,8 @@ export interface Term {
   startDate: string;
   endDate: string;
   breaks: DateSpan[];
+  /** Official academic calendar page the dates came from. */
+  calendarSource: string;
   /** Caltech quarters that roughly fall inside this Oxy semester. */
   caltechQuarters: CaltechQuarter[];
 }

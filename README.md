@@ -69,7 +69,7 @@ Every feature in the spec is clickable. A suggested walkthrough:
 | §3.2 | **Course detail + RateMyClass buttons** | Click any course. "See ratings for this class / professor" open a **new browser tab** (a placeholder page, since RateMyClass isn't live yet). |
 | §3.3 | **Favorites & collections** | Click **☆ Save** on a result or a section. Pick a collection or create and name one ("Spring 2027"). Manage them on **Collections**: rename, delete, remove, move between collections. |
 | §3.4 | **Visualizer with conflict display** | Save COMP 131-1 and MATH 120-1 (Fall 2026), go to **Visualizer**, and drag both onto the calendar (or press **+**). They overlap, so they sit side by side with a red outline and a conflict summary. Try **+ New schedule** to keep alternative plans. When you're happy, click **★ Use this as the final schedule** (signed in). Change the schedule later and the button becomes **Update final schedule**, which replaces the old final version. |
-| §3.4 | **Add to Google Calendar / Download .ics** | On a course detail page, each section has **Add to Google Calendar**, which opens Google Calendar in a new tab with the class prefilled (just click Save; no Google permissions are needed). It also has **⤓ .ics**. In the visualizer, **Download schedule (.ics)** exports the whole schedule for Apple or Google Calendar, and each course has its own Google Calendar link. Type a room next to any meeting time to include it in exports. Otherwise, add it in Google Calendar and choose "All events". A lab or extra session is its own event with its own room. Term dates and breaks are mock values. |
+| §3.4 | **Add to Google Calendar / Download .ics** | On a course detail page, each section has **Add to Google Calendar**, which opens Google Calendar in a new tab with the class prefilled (just click Save; no Google permissions are needed). It also has **⤓ .ics**. In the visualizer, **Download schedule (.ics)** exports the whole schedule for Apple or Google Calendar, and each course has its own Google Calendar link. Type a room next to any meeting time to include it in exports. Otherwise, add it in Google Calendar and choose "All events". A lab or extra session is its own event with its own room. Oxy class dates and no-class days come from the official academic calendar (see below); the .ics skips them, and Google links list them in the description. Caltech quarter dates are still mock. |
 | §3.5 | **Guest vs. signed in** | As a guest, data disappears when you close the tab. Save something, then **Sign in** (any name + an `@oxy.edu` email): you'll be offered to **import** your guest data. Signed-in data persists across visits. |
 | §3.5 | **Profile: year, one or more majors (incl. 3-2 tracks), course history** | **Profile** page. Add as many majors as you like (double major, or a major plus a "3-2 Engineering" track); remove one with ✕. To add a past course, pick the **term taken**, then type to match the course. |
 | §3.5 | **My Courses** | Signed in → **My Courses**. It shows your final schedule for each planning term (with room fields, Google Calendar links and an .ics download) and your past courses grouped by term. |
@@ -85,6 +85,12 @@ Use **Reset demo data** in the footer to start over.
 - **Vite + React 18 + TypeScript**, **React Router**, **Tailwind CSS v4**. Drag and drop uses the native HTML5 API.
 - Runs in **Docker** (`node:22-alpine`). Only `src/` and a few config files are mounted (read-only) for hot reload.
 - **Mock data** lives in `src/data/`. All data access goes through `src/api/`, so a real backend can replace the mock layer later without changing the UI.
+- **Academic calendar:** Oxy's first and last day of classes and no-class days live in `src/data/academic-calendar.json`. The file is generated from the official catalog pages by `scripts/scrape-academic-calendar.mjs`, which cross-checks every date against the weekday the table lists. To refresh it (for example, when a new catalog year is published), run the command below, review the diff, and commit it:
+
+  ```bash
+  docker run --rm -v "$PWD":/app -w /app node:22.12.0-alpine node scripts/scrape-academic-calendar.mjs
+  ```
+
 - Mock persistence: guests use `sessionStorage` (cleared when the tab closes), signed-in users use `localStorage` (kept between visits).
 
 ```

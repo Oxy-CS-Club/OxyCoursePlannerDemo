@@ -1,26 +1,26 @@
 // MOCK DATA for the demo. Course titles, instructors, times and rooms are
 // illustrative only and are NOT the official Oxy or Caltech schedule.
+import ACADEMIC_CALENDAR from "./academic-calendar.json";
 import type { CaltechQuarter, Course, DateSpan, Day, Department, Instructor, Meeting, Section, Term } from "../types";
 
-// Term dates are MOCK values for the calendar export demo.
+// Class dates and no-class days come from Oxy's official academic calendar,
+// scraped by scripts/scrape-academic-calendar.mjs into academic-calendar.json
+// (reviewed and committed; the app never scrapes at runtime).
+const OFFICIAL = ACADEMIC_CALENDAR.terms as Record<string, { source: string; firstDay: string; lastDay: string; noClass: DateSpan[] }>;
+const official = (termId: string) => ({
+  startDate: OFFICIAL[termId].firstDay,
+  endDate: OFFICIAL[termId].lastDay,
+  breaks: OFFICIAL[termId].noClass,
+  calendarSource: OFFICIAL[termId].source,
+});
+
 export const TERMS: Term[] = [
-  { id: "SP26", name: "Spring 2026", status: "past", caltechQuarters: ["WI", "SP"], startDate: "2026-01-20", endDate: "2026-05-08", breaks: [{ start: "2026-03-16", end: "2026-03-20", name: "Spring Break" }] },
-  {
-    id: "FA26",
-    name: "Fall 2026",
-    status: "current",
-    caltechQuarters: ["FA"],
-    startDate: "2026-08-31",
-    endDate: "2026-12-11",
-    breaks: [
-      { start: "2026-10-19", end: "2026-10-20", name: "Fall Break" },
-      { start: "2026-11-25", end: "2026-11-27", name: "Thanksgiving Break" },
-    ],
-  },
-  { id: "SP27", name: "Spring 2027", status: "future", caltechQuarters: ["WI", "SP"], startDate: "2027-01-19", endDate: "2027-05-07", breaks: [{ start: "2027-03-15", end: "2027-03-19", name: "Spring Break" }] },
+  { id: "SP26", name: "Spring 2026", status: "past", caltechQuarters: ["WI", "SP"], ...official("SP26") },
+  { id: "FA26", name: "Fall 2026", status: "current", caltechQuarters: ["FA"], ...official("FA26") },
+  { id: "SP27", name: "Spring 2027", status: "future", caltechQuarters: ["WI", "SP"], ...official("SP27") },
 ];
 
-/** MOCK Caltech quarter dates, keyed by the Oxy term they fall in. */
+/** MOCK Caltech quarter dates (Caltech has its own academic calendar, not scraped in the demo). */
 export const CALTECH_QUARTER_DATES: Record<string, Partial<Record<CaltechQuarter, DateSpan & { breaks: DateSpan[] }>>> = {
   SP26: {
     WI: { start: "2026-01-05", end: "2026-03-20", breaks: [] },

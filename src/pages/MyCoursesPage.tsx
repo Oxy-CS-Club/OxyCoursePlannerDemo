@@ -5,6 +5,7 @@ import { courseCode, getCourse, instructorNames, sectionLabel, sectionTitle, sec
 import { CoreBadge, InstitutionBadge, QuarterBadge } from "../components/Badges";
 import { CalendarActions } from "../components/CalendarActions";
 import { LocationEditor } from "../components/LocationEditor";
+import { TermDatesNote } from "../components/TermDatesNote";
 import { HISTORY_TERMS, SECTION_BY_ID, TERMS } from "../data/catalog";
 import { buildIcs, downloadIcs, safeFilename } from "../lib/calendar";
 import { useApp } from "../state/AppContext";
@@ -55,7 +56,10 @@ export function MyCoursesPage() {
                   </button>
                 </div>
               </header>
-              <p className="px-4 pt-3 text-xs text-stone-500">
+              <div className="px-4 pt-3">
+                <TermDatesNote termId={t.id} hasCaltech={sections.some((s) => s.caltechQuarter)} />
+              </div>
+              <p className="px-4 pt-1 text-xs text-stone-500">
                 Counts doesn't list classrooms. Add a room below to include it in exports, or add it later in Google Calendar and choose "All events" so every week updates.
               </p>
               <ul className="divide-y divide-stone-100">

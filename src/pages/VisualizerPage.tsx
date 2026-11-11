@@ -6,6 +6,7 @@ import { courseCode, getCourse, locationKey, sectionTitle, sectionUnits } from "
 import { InstitutionBadge, QuarterBadge } from "../components/Badges";
 import { CalendarActions } from "../components/CalendarActions";
 import { LocationEditor } from "../components/LocationEditor";
+import { TermDatesNote } from "../components/TermDatesNote";
 import { buildIcs, downloadIcs, safeFilename } from "../lib/calendar";
 import { QUARTER_NAMES, SECTION_BY_ID, TERM_BY_ID } from "../data/catalog";
 import { layoutDay, type CalEvent } from "../lib/overlap";
@@ -269,6 +270,9 @@ export function VisualizerPage() {
                 <span className="text-xs text-stone-500">
                   Import into Apple Calendar or Google Calendar, or add classes one by one to Google Calendar below. Counts doesn't list classrooms, so add rooms below if you want them in the export. If you add a room in Google Calendar instead, choose "All events" so every week updates.
                 </span>
+                <div className="w-full">
+                  <TermDatesNote termId={termId} hasCaltech={hasCaltech} />
+                </div>
                 {conflicts.length > 0 && (
                   <span className="w-full text-xs font-medium text-red-700">⚠ This schedule still has conflicts. Every course on it will be exported, so remove the ones you'll drop first.</span>
                 )}

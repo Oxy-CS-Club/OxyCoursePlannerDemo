@@ -37,15 +37,40 @@ export function firstOccurrence(days: Day[], start: string): string {
   return start;
 }
 
-/** Every class date that falls inside a break (used as EXDATE in the .ics). */
+/** Every class date that falls on a no-class day (used as EXDATE in the .ics). */
 function breakDates(days: Day[], breaks: DateSpan[]): string[] {
+  return breakDatesNamed(days, breaks).map((b) => b.date);
+}
+
+function breakDatesNamed(days: Day[], breaks: DateSpan[]): { date: string; name?: string }[] {
   const wanted = new Set(days.map((d) => JS_DAY[d]));
-  const out: string[] = [];
+  const out: { date: string; name?: string }[] = [];
   breaks.forEach((b) => {
-    for (let d = b.start; d <= b.end; d = addDays(d, 1)) if (wanted.has(parse(d).getUTCDay())) out.push(d);
+    for (let d = b.start; d <= b.end; d = addDays(d, 1)) if (wanted.has(parse(d).getUTCDay())) out.push({ date: d, name: b.name });
   });
   return out;
 }
+
+const fmtShort = (isoDate: string, weekday = true) =>
+  parse(isoDate).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", ...(weekday ? { weekday: "short" } : {}) });
+
+/** "Sep 7", "Oct 15–16", "Mar 30–Apr 2" */
+function fmtSpan(b: DateSpan): string {
+  if (b.start === b.end) return fmtShort(b.start, false);
+  const sameMonth = b.start.slice(0, 7) === b.end.slice(0, 7);
+  return `${fmtShort(b.start, false)}–${sameMonth ? Number(b.end.slice(8)) : fmtShort(b.end, false)}`;
+}
+
+/** One-line summary of a class period and its no-class days, e.g. for Fall 2026. */
+export function datesSummary({ start, end, breaks }: { start: string; end: string; breaks: DateSpan[] }): string {
+  const off = breaks.map((b) => `${fmtSpan(b)}${b.name ? ` (${b.name})` : ""}`).join(", ");
+  return `Classes ${fmtShort(start, false)} – ${fmtShort(end, false)}${off ? ` · no class ${off}` : ""}`;
+}
+
+export const termDatesSummary = (termId: string) => {
+  const t = TERM_BY_ID[termId];
+  return datesSummary({ start: t.startDate, end: t.endDate, breaks: t.breaks });
+};
 
 /** RRULE UNTIL must be UTC. Using 06:59Z the next day ≈ 11:59pm Pacific on the last day. */
 const until = (end: string) => `${compact(addDays(end, 1))}T065959Z`;
@@ -78,8 +103,12 @@ export function googleCalendarUrl(section: Section, meeting: Meeting, location?:
   const { start, end, breaks } = sectionDates(section);
   const first = firstOccurrence(meeting.days, start);
   const { title, lines } = eventInfo(section, meeting, Boolean(location));
-  if (breaks.length) {
-    lines.push(`Note: breaks (${breaks.map((b) => b.name ?? "break").join(", ")}) are not removed automatically. Delete those days, or use the .ics download instead.`);
+  // A Google template link can't skip dates, so list this class's no-class days explicitly.
+  const skipped = breakDatesNamed(meeting.days, breaks);
+  if (skipped.length) {
+    lines.push(
+      `No class on: ${skipped.map((b) => `${fmtShort(b.date)}${b.name ? ` (${b.name})` : ""}`).join(", ")}. Delete these dates from the series, or use the .ics download, which skips them automatically.`,
+    );
   }
   const params = new URLSearchParams({
     action: "TEMPLATE",
